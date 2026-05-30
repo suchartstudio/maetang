@@ -2,8 +2,17 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
-// 1. นำ URL Web App ของ Google Apps Script อันใหม่มาใส่ที่นี่ (ในเครื่องหมายคำพูด)
-const GOOGLE_DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbyLStJBYIUXldXaakNxgWrXtcCsukvmpycdHFhvOjqBFXescjaHsQUTOYPoHBJqEjY/exec";
+// 1. ตั้งค่าที่อยู่ของไฟล์สื่อบน GitHub
+// หากไฟล์อยู่ในโฟลเดอร์เดียวกับโค้ด สามารถระบุเป็นค่าว่าง "" ได้เลย (ระบบจะอ่านแบบ Relative Path)
+// หรือหากแยกโฟลเดอร์ สามารถระบุ URL เช่น "https://raw.githubusercontent.com/username/repo/main/" ได้ครับ
+const GITHUB_BASE_URL = ""; 
+
+const currentPlaylist = [
+    { name: "slide1.jpg", type: "image", url: GITHUB_BASE_URL + "slide1.jpg" },
+    { name: "slide2.jpg", type: "image", url: GITHUB_BASE_URL + "slide2.jpg" },
+    { name: "slide3.jpg", type: "image", url: GITHUB_BASE_URL + "slide3.jpg" },
+    { name: "video.mp4", type: "video", url: GITHUB_BASE_URL + "video.mp4" }
+];
 // ==========================================
 
 const firebaseConfig = {
@@ -22,7 +31,6 @@ const db = getFirestore(app);
 const urlParams = new URLSearchParams(window.location.search);
 const branchId = urlParams.get('branch') || '1';
 
-let currentPlaylist = [];
 let currentMediaIndex = 0;
 let imageTimer = null;
 
@@ -83,41 +91,17 @@ function updateTextData(data) {
     if (data.updateTime !== undefined) document.getElementById('update-time').innerText = data.updateTime;
 }
 
-// ฟังก์ชันดึงไฟล์สื่อจาก Google Drive API
-async function fetchMediaFromDrive() {
-    try {
-        const response = await fetch(GOOGLE_DRIVE_API_URL);
-        const files = await response.json();
-        
-        if (files && files.length > 0) {
-            // เช็คว่ามีไฟล์อัปเดตใหม่ไหม
-            if (JSON.stringify(files) !== JSON.stringify(currentPlaylist)) {
-                currentPlaylist = files;
-                currentMediaIndex = 0;
-                document.getElementById('media-container').innerHTML = ''; // รีเซ็ตหน้าจอ
-                playCurrentMedia();
-            }
-        } else {
-            currentPlaylist = [];
-            document.getElementById('media-container').innerHTML = `<img src="default-bg.jpg" style="width: 100%; height: 100%; object-fit: fill;">`;
-        }
-    } catch (error) {
-        console.error("เชื่อมต่อ Google Drive ไม่สำเร็จ:", error);
-    }
-}
-
 // ฟังก์ชันหลักในการเล่นสื่อ (Cross-fade สำหรับภาพ & บังคับเล่นสำหรับวิดีโอ)
 function playCurrentMedia() {
     const mediaContainer = document.getElementById('media-container');
 
     if (currentPlaylist.length === 0) {
-        mediaContainer.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#333; color:#fff; font-size:2vw;">กำลังโหลดสื่อ หรือไม่พบไฟล์...</div>`;
+        mediaContainer.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#333; color:#fff; font-size:2vw;">ไม่พบไฟล์สื่อ...</div>`;
         return;
     }
     
     clearTimeout(imageTimer);
     
-    // ถ้ารันจนจบ ให้กลับไปเริ่มไฟล์แรกใหม่
     if (currentMediaIndex >= currentPlaylist.length) {
         currentMediaIndex = 0; 
     }
@@ -125,13 +109,11 @@ function playCurrentMedia() {
     const currentFile = currentPlaylist[currentMediaIndex];
 
     // ==========================================
-    // โหมดวิดีโอ: สร้าง Element ใหม่และบังคับ Play
+    // โหมดวิดีโอ: เล่นอัตโนมัติแบบปิดเสียง
     // ==========================================
     if (currentFile.type === 'video') {
-        // ลบ fader images หรือวิดีโอตัวเก่าออกให้หมดก่อน
         mediaContainer.innerHTML = ''; 
 
-        // สร้าง Video Element
         const videoEl = document.createElement('video');
         videoEl.id = 'signage-video';
         videoEl.src = currentFile.url;
@@ -140,27 +122,23 @@ function playCurrentMedia() {
         videoEl.playsInline = true;
         videoEl.style.cssText = "width: 100%; height: 100%; object-fit: fill; background-color: #000;";
 
-        // เมื่อเล่นจบให้ไปไฟล์ถัดไป
         videoEl.onended = () => {
             currentMediaIndex++;
             playCurrentMedia();
         };
 
-        // ถ้าเล่นไม่ได้ ให้ข้ามทันที
         videoEl.onerror = () => {
-            console.error(`ข้ามไฟล์วิดีโอ ${currentFile.name} เนื่องจากไม่สามารถโหลดจาก Drive ได้`);
+            console.error(`ข้ามไฟล์วิดีโอ ${currentFile.name} เนื่องจากไม่สามารถโหลดได้`);
             currentMediaIndex++;
             playCurrentMedia();
         };
 
         mediaContainer.appendChild(videoEl);
 
-        // บังคับให้เบราว์เซอร์เล่นวิดีโอทันทีเพื่อทะลวงระบบบล็อก
         let playPromise = videoEl.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => {
                 console.error("เบราว์เซอร์บล็อกการเล่นวิดีโออัตโนมัติ:", error);
-                // ถ้าโดนบล็อก ให้ข้ามไปไฟล์ถัดไป เพื่อไม่ให้จอค้าง
                 currentMediaIndex++;
                 playCurrentMedia();
             });
@@ -168,7 +146,7 @@ function playCurrentMedia() {
         
     } 
     // ==========================================
-    // โหมดรูปภาพ: ใช้ระบบ Fader ซ้อนรูป
+    // โหมดรูปภาพ: เอฟเฟกต์ Fade ซ้อนรูป
     // ==========================================
     else {
         if (mediaContainer.style.position !== 'relative') {
@@ -177,7 +155,6 @@ function playCurrentMedia() {
 
         const existingImg = mediaContainer.querySelector('img.active-fader-img');
 
-        // สร้างรูปภาพใหม่รอไว้แบบซ่อน
         const nextImg = document.createElement('img');
         nextImg.src = currentFile.url;
         nextImg.alt = "Signage Media";
@@ -186,24 +163,20 @@ function playCurrentMedia() {
 
         nextImg.onload = () => {
             if (existingImg) {
-                // วางภาพใหม่ซ้อนลงไป
                 nextImg.style.zIndex = "1";
                 mediaContainer.appendChild(nextImg);
 
-                // สลับ z-index
                 existingImg.style.zIndex = "1";
                 nextImg.style.zIndex = "2";
 
-                void nextImg.offsetWidth; // บังคับให้เบราว์เซอร์อัปเดต
+                void nextImg.offsetWidth; 
 
-                // เฟดภาพเข้า-ออก
                 nextImg.style.opacity = "1";
                 existingImg.style.opacity = "0";
                 
                 existingImg.classList.remove('active-fader-img');
                 nextImg.classList.add('active-fader-img');
 
-                // ลบภาพเก่าออกเมื่อเฟดเสร็จ
                 setTimeout(() => {
                     existingImg.remove();
                 }, FADE_DURATION);
@@ -215,7 +188,6 @@ function playCurrentMedia() {
                 mediaContainer.appendChild(nextImg);
             }
 
-            // ตั้งเวลาถอยหลังเปลี่ยนภาพ
             imageTimer = setTimeout(() => {
                 currentMediaIndex++;
                 playCurrentMedia();
@@ -230,15 +202,12 @@ function playCurrentMedia() {
     }
 }
 
-// สั่งให้ดึงภาพจาก Drive ทันทีที่เปิดหน้าเว็บ
-fetchMediaFromDrive();
-
-// ตั้งเวลาเช็กไฟล์ใน Drive ใหม่ทุกๆ 5 นาที
-setInterval(fetchMediaFromDrive, 300000); 
+// สั่งเริ่มเล่นคิวสื่อจากลิสต์ที่เรากำหนดทันที
+playCurrentMedia();
 
 let autoFetchInterval = null;
 
-// เชื่อมต่อ Firebase Firestore เพื่อรับข้อมูลตัววิ่ง และโหมดราคา
+// เชื่อมต่อ Firebase Firestore เพื่อรับข้อมูลราคาทองและข้อความตัววิ่ง
 onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
     if (docSnap.exists()) {
         const config = docSnap.data();
