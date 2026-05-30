@@ -4,7 +4,6 @@ import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasej
 // ==========================================
 // 1. ตั้งค่าที่อยู่ของไฟล์สื่อบน GitHub
 // หากไฟล์อยู่ในโฟลเดอร์เดียวกับโค้ด สามารถระบุเป็นค่าว่าง "" ได้เลย (ระบบจะอ่านแบบ Relative Path)
-// หรือหากแยกโฟลเดอร์ สามารถระบุ URL เช่น "https://raw.githubusercontent.com/username/repo/main/" ได้ครับ
 const GITHUB_BASE_URL = ""; 
 
 const currentPlaylist = [
@@ -35,7 +34,7 @@ let currentMediaIndex = 0;
 let imageTimer = null;
 
 // ==========================================
-// 2. การตั้งค่า Effect การเล่นสื่อ
+// 2. การตั้งค่าสไลด์ภาพนิ่ง
 const IMAGE_DURATION = 10000; // เวลาแสดงรูปภาพ (10 วินาที)
 const FADE_DURATION = 1000;   // เวลาในการเฟดเลือนหาย (1 วินาที)
 // ==========================================
@@ -91,7 +90,7 @@ function updateTextData(data) {
     if (data.updateTime !== undefined) document.getElementById('update-time').innerText = data.updateTime;
 }
 
-// ฟังก์ชันหลักในการเล่นสื่อ (Cross-fade สำหรับภาพ & บังคับเล่นสำหรับวิดีโอ)
+// ฟังก์ชันหลักในการเล่นสื่อ วนลูปรูปภาพและวิดีโอ
 function playCurrentMedia() {
     const mediaContainer = document.getElementById('media-container');
 
@@ -100,6 +99,7 @@ function playCurrentMedia() {
         return;
     }
     
+    // เคลียร์ Timer ของรูปภาพเดิมทุกครั้งที่มีการเปลี่ยนไฟล์ (ป้องกันการขัดจังหวะการเล่นวิดีโอ)
     clearTimeout(imageTimer);
     
     if (currentMediaIndex >= currentPlaylist.length) {
@@ -109,44 +109,47 @@ function playCurrentMedia() {
     const currentFile = currentPlaylist[currentMediaIndex];
 
     // ==========================================
-    // โหมดวิดีโอ: เล่นอัตโนมัติแบบปิดเสียง
+    // [โหมดวิดีโอ] บังคับให้เล่นจนจบไฟล์ร้อยเปอร์เซ็นต์
     // ==========================================
     if (currentFile.type === 'video') {
-        mediaContainer.innerHTML = ''; 
+        mediaContainer.innerHTML = ''; // ล้างรูปสไลด์เก่าออกเพื่อเตรียมพื้นที่ให้วิดีโอเต็มจอ
 
         const videoEl = document.createElement('video');
         videoEl.id = 'signage-video';
         videoEl.src = currentFile.url;
         videoEl.autoplay = true;
-        videoEl.muted = true;
+        videoEl.muted = true;      // จำเป็นต้องเปิดไว้เพื่อให้ระบบเบราว์เซอร์ยอมรับการ Autoplay
         videoEl.playsInline = true;
         videoEl.style.cssText = "width: 100%; height: 100%; object-fit: fill; background-color: #000;";
 
+        // ฟังก์ชันเมื่อวิดีโอเล่นจบไฟล์อย่างสมบูรณ์
         videoEl.onended = () => {
             currentMediaIndex++;
-            playCurrentMedia();
+            playCurrentMedia(); // เรียกคิวถัดไปมารันต่อ
         };
 
+        // ในกรณีที่ไฟล์วิดีโอเสีย หรือโหลดไม่ผ่าน ให้ข้ามไปสไลด์ถัดไปทันที (ป้องกันหน้าจอค้างคิว)
         videoEl.onerror = () => {
-            console.error(`ข้ามไฟล์วิดีโอ ${currentFile.name} เนื่องจากไม่สามารถโหลดได้`);
+            console.error(`ข้ามไฟล์วิดีโอเนื่องจากไม่สามารถโหลดได้: ${currentFile.name}`);
             currentMediaIndex++;
             playCurrentMedia();
         };
 
         mediaContainer.appendChild(videoEl);
 
+        // สั่ง Execute เล่นวิดีโอ
         let playPromise = videoEl.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => {
-                console.error("เบราว์เซอร์บล็อกการเล่นวิดีโออัตโนมัติ:", error);
+                console.error("การเล่นวิดีโออัตโนมัติถูกปิดกั้นโดยระบบรักษาความปลอดภัยเบราว์เซอร์:", error);
+                // หากโดนบล็อกการเล่นอัตโนมัติ ให้ทำการข้ามไปเล่นไฟล์ถัดไปทันทีเพื่อไม่ให้จอหน้าร้านมืดค้าง
                 currentMediaIndex++;
                 playCurrentMedia();
             });
         }
-        
     } 
     // ==========================================
-    // โหมดรูปภาพ: เอฟเฟกต์ Fade ซ้อนรูป
+    // [โหมดรูปภาพ] ตั้งเวลาทำงานตาม IMAGE_DURATION (10 วินาที)
     // ==========================================
     else {
         if (mediaContainer.style.position !== 'relative') {
@@ -188,6 +191,7 @@ function playCurrentMedia() {
                 mediaContainer.appendChild(nextImg);
             }
 
+            // ตั้งเวลาถอยหลัง 10 วินาทีสำหรับรูปภาพนิ่งก่อนจะขยับสไลด์ต่อไป
             imageTimer = setTimeout(() => {
                 currentMediaIndex++;
                 playCurrentMedia();
@@ -195,19 +199,19 @@ function playCurrentMedia() {
         };
         
         nextImg.onerror = () => {
-            console.error(`ข้ามไฟล์ภาพ ${currentFile.name} เนื่องจากโหลดไม่ได้`);
+            console.error(`ข้ามไฟล์ภาพเนื่องจากไม่สามารถโหลดได้: ${currentFile.name}`);
             currentMediaIndex++;
             playCurrentMedia();
         };
     }
 }
 
-// สั่งเริ่มเล่นคิวสื่อจากลิสต์ที่เรากำหนดทันที
+// เริ่มต้นเล่นสื่อทันทีเมื่อเปิดเบราว์เซอร์
 playCurrentMedia();
 
 let autoFetchInterval = null;
 
-// เชื่อมต่อ Firebase Firestore เพื่อรับข้อมูลราคาทองและข้อความตัววิ่ง
+// เชื่อมต่อระบบ Firebase Firestore เพื่อสตรีมข้อมูลข้อความตัววิ่งและราคาทองแบบเรียลไทม์
 onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
     if (docSnap.exists()) {
         const config = docSnap.data();
