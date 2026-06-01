@@ -1,9 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
 // 1. ตั้งค่าที่อยู่ของไฟล์สื่อบน GitHub
-// หากไฟล์อยู่ในโฟลเดอร์เดียวกับโค้ด สามารถระบุเป็นค่าว่าง "" ได้เลย (ระบบจะอ่านแบบ Relative Path)
 const GITHUB_BASE_URL = ""; 
 
 const currentPlaylist = [
@@ -35,11 +34,48 @@ let imageTimer = null;
 
 // ==========================================
 // 2. การตั้งค่าสไลด์ภาพนิ่ง
-const IMAGE_DURATION = 10000; // เวลาแสดงรูปภาพ (10 วินาที)
-const FADE_DURATION = 1000;   // เวลาในการเฟดเลือนหาย (1 วินาที)
+const IMAGE_DURATION = 10000; 
+const FADE_DURATION = 1000;   
 // ==========================================
 
-// ฟังก์ชันแปลงตัวเลขเป็นจำนวนเต็มพร้อมใส่ลูกน้ำ
+// ==========================================
+// 3. ระบบจัดการประวัติราคา (สำหรับ Dashboard)
+// ==========================================
+let lastRecordedPrice = null;
+
+// ดึงราคาล่าสุดจาก Firebase เพื่อป้องกันการบันทึกซ้ำตอนรีเฟรชหน้าจอ
+async function initLastRecordedPrice() {
+    try {
+        const q = query(collection(db, "price_history"), orderBy("timestamp", "desc"), limit(1));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+            lastRecordedPrice = snapshot.docs[0].data().buyPrice;
+        }
+    } catch (e) {
+        console.error("ไม่สามารถดึงประวัติราคาล่าสุดได้:", e);
+    }
+}
+initLastRecordedPrice();
+
+// ฟังก์ชันตรวจสอบและบันทึกราคา หากมีการปรับเปลี่ยน
+async function checkAndRecordPrice(currentBuyPrice) {
+    if (!currentBuyPrice || isNaN(currentBuyPrice)) return;
+    
+    if (lastRecordedPrice === null || currentBuyPrice !== lastRecordedPrice) {
+        try {
+            await addDoc(collection(db, "price_history"), {
+                buyPrice: currentBuyPrice,
+                timestamp: new Date()
+            });
+            lastRecordedPrice = currentBuyPrice;
+            console.log("บันทึกประวัติราคาใหม่เพื่ออัปเดต Dashboard:", currentBuyPrice);
+        } catch (error) {
+            console.error("บันทึกประวัติราคาล้มเหลว:", error);
+        }
+    }
+}
+// ==========================================
+
 function formatToIntegerPrice(priceStr) {
     if (!priceStr) return "-";
     const cleanStr = priceStr.toString().replace(/,/g, '');
@@ -47,7 +83,6 @@ function formatToIntegerPrice(priceStr) {
     return isNaN(num) ? "-" : num.toLocaleString('en-US');
 }
 
-// ฟังก์ชันดึงราคาและจัดการวันที่จาก API
 async function fetchGoldTradersPrice() {
     try {
         const response = await fetch('https://api.chnwt.dev/thai-gold-api/latest');
@@ -68,6 +103,7 @@ async function fetchGoldTradersPrice() {
         const updateTime = data.response.update_time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
         return {
+            rawBarBuy: parseFloat(prices.gold_bar.buy.replace(/,/g, '')), // คืนค่าตัวเลขดิบสำหรับทำกราฟ
             barBuy: formatToIntegerPrice(prices.gold_bar.buy),
             barSell: formatToIntegerPrice(prices.gold_bar.sell),
             ornamentBuy: formatToIntegerPrice(prices.gold.buy),
@@ -80,7 +116,6 @@ async function fetchGoldTradersPrice() {
     }
 }
 
-// ฟังก์ชันอัปเดตข้อความบนหน้าจอ
 function updateTextData(data) {
     if(data.barBuy !== undefined) document.getElementById('bar-buy').innerText = data.barBuy;
     if(data.barSell !== undefined) document.getElementById('bar-sell').innerText = data.barSell;
@@ -90,7 +125,6 @@ function updateTextData(data) {
     if (data.updateTime !== undefined) document.getElementById('update-time').innerText = data.updateTime;
 }
 
-// ฟังก์ชันหลักในการเล่นสื่อ วนลูปรูปภาพและวิดีโอ
 function playCurrentMedia() {
     const mediaContainer = document.getElementById('media-container');
 
@@ -99,7 +133,6 @@ function playCurrentMedia() {
         return;
     }
     
-    // เคลียร์ Timer ของรูปภาพเดิมทุกครั้งที่มีการเปลี่ยนไฟล์ (ป้องกันการขัดจังหวะการเล่นวิดีโอ)
     clearTimeout(imageTimer);
     
     if (currentMediaIndex >= currentPlaylist.length) {
@@ -108,27 +141,22 @@ function playCurrentMedia() {
 
     const currentFile = currentPlaylist[currentMediaIndex];
 
-    // ==========================================
-    // [โหมดวิดีโอ] บังคับให้เล่นจนจบไฟล์ร้อยเปอร์เซ็นต์
-    // ==========================================
     if (currentFile.type === 'video') {
-        mediaContainer.innerHTML = ''; // ล้างรูปสไลด์เก่าออกเพื่อเตรียมพื้นที่ให้วิดีโอเต็มจอ
+        mediaContainer.innerHTML = ''; 
 
         const videoEl = document.createElement('video');
         videoEl.id = 'signage-video';
         videoEl.src = currentFile.url;
         videoEl.autoplay = true;
-        videoEl.muted = true;      // จำเป็นต้องเปิดไว้เพื่อให้ระบบเบราว์เซอร์ยอมรับการ Autoplay
+        videoEl.muted = true;      
         videoEl.playsInline = true;
         videoEl.style.cssText = "width: 100%; height: 100%; object-fit: fill; background-color: #000;";
 
-        // ฟังก์ชันเมื่อวิดีโอเล่นจบไฟล์อย่างสมบูรณ์
         videoEl.onended = () => {
             currentMediaIndex++;
-            playCurrentMedia(); // เรียกคิวถัดไปมารันต่อ
+            playCurrentMedia(); 
         };
 
-        // ในกรณีที่ไฟล์วิดีโอเสีย หรือโหลดไม่ผ่าน ให้ข้ามไปสไลด์ถัดไปทันที (ป้องกันหน้าจอค้างคิว)
         videoEl.onerror = () => {
             console.error(`ข้ามไฟล์วิดีโอเนื่องจากไม่สามารถโหลดได้: ${currentFile.name}`);
             currentMediaIndex++;
@@ -137,20 +165,15 @@ function playCurrentMedia() {
 
         mediaContainer.appendChild(videoEl);
 
-        // สั่ง Execute เล่นวิดีโอ
         let playPromise = videoEl.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => {
-                console.error("การเล่นวิดีโออัตโนมัติถูกปิดกั้นโดยระบบรักษาความปลอดภัยเบราว์เซอร์:", error);
-                // หากโดนบล็อกการเล่นอัตโนมัติ ให้ทำการข้ามไปเล่นไฟล์ถัดไปทันทีเพื่อไม่ให้จอหน้าร้านมืดค้าง
+                console.error("การเล่นวิดีโออัตโนมัติถูกปิดกั้น:", error);
                 currentMediaIndex++;
                 playCurrentMedia();
             });
         }
     } 
-    // ==========================================
-    // [โหมดรูปภาพ] ตั้งเวลาทำงานตาม IMAGE_DURATION (10 วินาที)
-    // ==========================================
     else {
         if (mediaContainer.style.position !== 'relative') {
             mediaContainer.style.position = 'relative';
@@ -191,7 +214,6 @@ function playCurrentMedia() {
                 mediaContainer.appendChild(nextImg);
             }
 
-            // ตั้งเวลาถอยหลัง 10 วินาทีสำหรับรูปภาพนิ่งก่อนจะขยับสไลด์ต่อไป
             imageTimer = setTimeout(() => {
                 currentMediaIndex++;
                 playCurrentMedia();
@@ -206,12 +228,10 @@ function playCurrentMedia() {
     }
 }
 
-// เริ่มต้นเล่นสื่อทันทีเมื่อเปิดเบราว์เซอร์
 playCurrentMedia();
 
 let autoFetchInterval = null;
 
-// เชื่อมต่อระบบ Firebase Firestore เพื่อสตรีมข้อมูลข้อความตัววิ่งและราคาทองแบบเรียลไทม์
 onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
     if (docSnap.exists()) {
         const config = docSnap.data();
@@ -222,6 +242,7 @@ onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
             const goldPrice = await fetchGoldTradersPrice();
             if (goldPrice && goldPrice.barBuy !== "-") {
                 updateTextData({ ...config, ...goldPrice }); 
+                checkAndRecordPrice(goldPrice.rawBarBuy); // ส่งค่าดึงอัตโนมัติไปบันทึกลง Dashboard
             } else {
                 updateTextData(config); 
             }
@@ -230,12 +251,20 @@ onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
                 const freshPrice = await fetchGoldTradersPrice();
                 if (freshPrice && freshPrice.barBuy !== "-") {
                     updateTextData(freshPrice);
+                    checkAndRecordPrice(freshPrice.rawBarBuy); // อัปเดตซ้ำทุกๆ นาที
                 }
             }, 60000);
 
         } else {
             const manualConfig = { ...config };
-            if (manualConfig.barBuy) manualConfig.barBuy = formatToIntegerPrice(manualConfig.barBuy);
+            
+            // กรณีใช้โหมด Manual ก็ส่งราคาตั้งเองไปแสดงบนกราฟได้เช่นกัน
+            if (manualConfig.barBuy) {
+                const rawManualPrice = parseFloat(manualConfig.barBuy.toString().replace(/,/g, ''));
+                checkAndRecordPrice(rawManualPrice);
+                manualConfig.barBuy = formatToIntegerPrice(manualConfig.barBuy);
+            }
+            
             if (manualConfig.barSell) manualConfig.barSell = formatToIntegerPrice(manualConfig.barSell);
             if (manualConfig.ornamentBuy) manualConfig.ornamentBuy = formatToIntegerPrice(manualConfig.ornamentBuy);
             if (manualConfig.ornamentSell) manualConfig.ornamentSell = formatToIntegerPrice(manualConfig.ornamentSell);
