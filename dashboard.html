@@ -7,137 +7,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Kanit', sans-serif;
-        }
-
-        body {
-            background-color: #f4f7f6;
-            color: #333;
-            padding: 2rem;
-        }
-
-        .dashboard-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header-title {
-            color: #FF0000;
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* ส่วนการ์ดสรุปข้อมูลด้านบน */
-        .summary-cards {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            flex: 1;
-            background: #fff;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            border-left: 6px solid #FF0000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .card-title {
-            font-size: 18px;
-            color: #666;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-
-        .card-value {
-            font-size: 42px;
-            font-weight: 700;
-            color: #000;
-        }
-
-        .card-value.positive {
-            color: #00a650; /* สีเขียวสำหรับขึ้น */
-        }
-
-        .card-value.negative {
-            color: #e53935; /* สีแดงสำหรับลง */
-        }
-        
-        .card-value.neutral {
-            color: #000; 
-        }
-
-        /* ส่วนกราฟและปุ่มควบคุม */
-        .chart-section {
-            background: #fff;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .chart-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 15px;
-        }
-
-        .chart-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .toggle-buttons {
-            display: flex;
-            background: #f0f0f0;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .toggle-btn {
-            padding: 10px 25px;
-            border: none;
-            background: transparent;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            color: #555;
-            transition: all 0.3s ease;
-        }
-
-        .toggle-btn.active {
-            background: #FF0000;
-            color: #FFFF00; /* แดง-เหลือง ตามธีมร้าน */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .canvas-container {
-            position: relative;
-            height: 500px;
-            width: 100%;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+        body { background-color: #f4f7f6; color: #333; padding: 2rem; }
+        .dashboard-container { max-width: 1200px; margin: 0 auto; }
+        .header-title { color: #FF0000; font-size: 28px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .summary-cards { display: flex; gap: 20px; margin-bottom: 30px; }
+        .card { flex: 1; background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid #FF0000; display: flex; flex-direction: column; justify-content: center; }
+        .card-title { font-size: 18px; color: #666; margin-bottom: 10px; font-weight: 500; }
+        .card-value { font-size: 42px; font-weight: 700; color: #000; }
+        .card-value.positive { color: #00a650; }
+        .card-value.negative { color: #e53935; }
+        .card-value.neutral { color: #000; }
+        .chart-section { background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .chart-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .chart-title { font-size: 20px; font-weight: 600; color: #333; }
+        .toggle-buttons { display: flex; background: #f0f0f0; border-radius: 8px; overflow: hidden; }
+        .toggle-btn { padding: 10px 25px; border: none; background: transparent; font-size: 16px; font-weight: 500; cursor: pointer; color: #555; transition: all 0.3s ease; }
+        .toggle-btn.active { background: #FF0000; color: #FFFF00; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .canvas-container { position: relative; height: 500px; width: 100%; }
+        .status-text { font-size: 14px; color: #888; margin-top: 10px; text-align: right; }
     </style>
 </head>
 <body>
 
     <div class="dashboard-container">
         <div class="header-title">
-            📊 แดชบอร์ดสรุปราคาทองคำ (ทองคำแท่ง 96.5%)
+            📊 แดชบอร์ดสถิติราคาทองคำ (ทองคำแท่ง 96.5%)
         </div>
 
         <div class="summary-cards">
@@ -162,36 +57,69 @@
             <div class="canvas-container">
                 <canvas id="goldChart"></canvas>
             </div>
+            <div class="status-text" id="sync-status">สถานะ: รอการซิงก์ข้อมูล...</div>
         </div>
     </div>
 
-    <script>
-        // ชุดข้อมูลสำหรับการแสดงผลกราฟ
-        const dailyData = {
-            labels: ['09:30', '11:00', '13:15', '14:30', '15:00', '16:15'],
-            prices: [40400, 40450, 40450, 40500, 40450, 40550]
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, orderBy, getDocs, limit, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ตั้งค่า Firebase ตามที่คุณให้มา
+        const firebaseConfig = {
+            apiKey: "AIzaSyCypw3-0kmRKQCtMuVakq4dL-IfQ3UIAG4",
+            authDomain: "goldshop-d5860.firebaseapp.com",
+            projectId: "goldshop-d5860",
+            storageBucket: "goldshop-d5860.firebasestorage.app",
+            messagingSenderId: "15818908224",
+            appId: "1:15818908224:web:17fc243d2aa671660075a5",
+            measurementId: "G-9FP9640SQH"
         };
 
-        const monthlyData = {
-            labels: ['1 มิ.ย.', '5 มิ.ย.', '10 มิ.ย.', '15 มิ.ย.', '20 มิ.ย.', '25 มิ.ย.', '30 มิ.ย.'],
-            prices: [39800, 40100, 40050, 40300, 40200, 40450, 40550]
-        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         let goldChartInstance = null;
         let currentMode = 'daily';
+        
+        // ตัวแปรเก็บข้อมูลเพื่อวาดกราฟ
+        let dailyLabels = [];
+        let dailyPrices = [];
+        let monthlyLabels = [];
+        let monthlyPrices = [];
+        
+        let lastRecordedPrice = null;
 
-        // ฟังก์ชันแปลงตัวเลขให้มีลูกน้ำ
         function formatNumber(num) {
             return num.toLocaleString('en-US');
         }
 
-        // ฟังก์ชันวาดกราฟ
+        // ฟังก์ชันจัดรูปแบบเวลาเป็น HH:MM
+        function formatTime(dateObj) {
+            return dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // ฟังก์ชันจัดรูปแบบวันที่เป็น DD/MM/YYYY
+        function formatDate(dateObj) {
+            return dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        }
+
         function renderChart(dataLabels, dataValues) {
             const ctx = document.getElementById('goldChart').getContext('2d');
             
             if (goldChartInstance) {
-                goldChartInstance.destroy(); // ลบกราฟเก่าทิ้งก่อนวาดใหม่
+                goldChartInstance.destroy(); 
             }
+
+            // ถ้าไม่มีข้อมูล ให้สร้างกราฟเปล่า
+            if (dataLabels.length === 0) {
+                dataLabels = ['ไม่มีข้อมูล'];
+                dataValues = [0];
+            }
+
+            let minVal = Math.min(...dataValues) - 200;
+            let maxVal = Math.max(...dataValues) + 200;
+            if (dataValues[0] === 0) { minVal = 0; maxVal = 100; } // กรณีไม่มีข้อมูล
 
             goldChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -200,24 +128,22 @@
                     datasets: [{
                         label: ' ราคารับซื้อ (บาท)',
                         data: dataValues,
-                        borderColor: '#FF0000', // เส้นสีแดง
-                        backgroundColor: 'rgba(255, 0, 0, 0.1)', // พื้นใต้กราฟสีแดงอ่อน
+                        borderColor: '#FF0000',
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
                         borderWidth: 3,
-                        pointBackgroundColor: '#FFFF00', // จุดสีเหลือง
+                        pointBackgroundColor: '#FFFF00',
                         pointBorderColor: '#FF0000',
                         pointRadius: 6,
                         pointHoverRadius: 8,
                         fill: true,
-                        tension: 0.3 // ความโค้งของเส้นกราฟ
+                        tension: 0.1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
-                        },
+                        legend: { display: false },
                         tooltip: {
                             backgroundColor: 'rgba(0,0,0,0.8)',
                             titleFont: { family: 'Kanit', size: 14 },
@@ -233,12 +159,9 @@
                     },
                     scales: {
                         y: {
-                            min: Math.min(...dataValues) - 200, // ขอบเขตล่างของกราฟ
-                            max: Math.max(...dataValues) + 200, // ขอบเขตบนของกราฟ
-                            ticks: {
-                                font: { family: 'Kanit', size: 14 },
-                                callback: function(value) { return formatNumber(value); }
-                            },
+                            min: minVal,
+                            max: maxVal,
+                            ticks: { font: { family: 'Kanit', size: 14 }, callback: function(value) { return formatNumber(value); } },
                             grid: { color: '#f0f0f0' }
                         },
                         x: {
@@ -250,71 +173,142 @@
             });
         }
 
-        // ฟังก์ชันสลับแท็บ รายวัน/รายเดือน
         window.switchTab = function(mode) {
             currentMode = mode;
-            
-            // เปลี่ยนสีปุ่ม
             document.getElementById('btn-daily').classList.remove('active');
             document.getElementById('btn-monthly').classList.remove('active');
             document.getElementById(`btn-${mode}`).classList.add('active');
 
-            // เปลี่ยนหัวข้อและวาดกราฟใหม่
             if (mode === 'daily') {
                 document.getElementById('chart-heading').innerText = 'แนวโน้มราคาทองคำ (รายวัน)';
-                renderChart(dailyData.labels, dailyData.prices);
+                renderChart(dailyLabels, dailyPrices);
             } else {
                 document.getElementById('chart-heading').innerText = 'แนวโน้มราคาทองคำ (รายเดือน)';
-                renderChart(monthlyData.labels, monthlyData.prices);
+                renderChart(monthlyLabels, monthlyPrices);
             }
         };
 
-        // ฟังก์ชันดึงข้อมูลจาก API ของสมาคม (ชุดเดียวกับที่ใช้บนหน้าจอ)
-        async function fetchDashboardData() {
+        // ฟังก์ชันดึงประวัติราคาจาก Firebase เพื่อมาสร้างกราฟ
+        async function loadHistoryFromFirebase() {
+            try {
+                // คำนวณเวลาเริ่มต้นของวันนี้ (00:00:00)
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+
+                // ดึงข้อมูลทั้งหมดเรียงตามเวลา
+                const q = query(collection(db, "price_history"), orderBy("timestamp", "asc"));
+                const querySnapshot = await getDocs(q);
+
+                let dLabels = [];
+                let dPrices = [];
+                
+                // สำหรับกราฟรายเดือน (เก็บแค่วันละ 1 ราคา ล่าสุดของวันนั้น)
+                let monthlyMap = new Map();
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const recordDate = data.timestamp.toDate();
+                    
+                    // แยกเก็บสำหรับรายวัน (เฉพาะของวันนี้)
+                    if (recordDate >= startOfToday) {
+                        dLabels.push(formatTime(recordDate));
+                        dPrices.push(data.buyPrice);
+                    }
+
+                    // แยกเก็บสำหรับรายเดือน
+                    monthlyMap.set(formatDate(recordDate), data.buyPrice);
+                });
+
+                dailyLabels = dLabels;
+                dailyPrices = dPrices;
+                
+                monthlyLabels = Array.from(monthlyMap.keys());
+                monthlyPrices = Array.from(monthlyMap.values());
+
+                // อัปเดตกราฟบนหน้าจอตามโหมดปัจจุบัน
+                if(currentMode === 'daily') {
+                    renderChart(dailyLabels, dailyPrices);
+                } else {
+                    renderChart(monthlyLabels, monthlyPrices);
+                }
+
+                // อัปเดตตัวแปรราคาสุดท้าย เพื่อเอาไว้เทียบตอนดึง API รอบถัดไป
+                if (dPrices.length > 0) {
+                    lastRecordedPrice = dPrices[dPrices.length - 1];
+                }
+
+                // อัปเดตหน้าปัด "ผลต่าง"
+                if (dPrices.length >= 2) {
+                    const diff = dPrices[dPrices.length - 1] - dPrices[dPrices.length - 2];
+                    updateChangeCard(diff);
+                } else {
+                    updateChangeCard(0); // ถ้ายอดแรกของวัน ให้เป็น 0
+                }
+
+                document.getElementById('sync-status').innerText = `ซิงก์ข้อมูลกราฟล่าสุดเมื่อ: ${new Date().toLocaleTimeString('th-TH')}`;
+
+            } catch (error) {
+                console.error("โหลดประวัติจาก Firebase ไม่สำเร็จ:", error);
+                document.getElementById('sync-status').innerText = `โหลดข้อมูลกราฟผิดพลาด`;
+            }
+        }
+
+        // ฟังก์ชันอัปเดตสีตัวเลขผลต่างราคา
+        function updateChangeCard(change) {
+            const changeElement = document.getElementById('price-change');
+            if (change > 0) {
+                changeElement.innerText = `+${formatNumber(change)}`;
+                changeElement.className = 'card-value positive';
+            } else if (change < 0) {
+                changeElement.innerText = `${formatNumber(change)}`;
+                changeElement.className = 'card-value negative';
+            } else {
+                changeElement.innerText = `0`;
+                changeElement.className = 'card-value neutral';
+            }
+        }
+
+        // ฟังก์ชันตรวจสอบและบันทึกราคาใหม่จากสมาคม
+        async function fetchAndRecordPrice() {
             try {
                 const response = await fetch('https://api.chnwt.dev/thai-gold-api/latest');
                 const data = await response.json();
                 
                 if (data.status === "success") {
                     const currentBuyPrice = parseFloat(data.response.price.gold_bar.buy.replace(/,/g, ''));
-                    
-                    // อัปเดตการ์ด "ราคารับซื้อปัจจุบัน"
                     document.getElementById('current-price').innerText = formatNumber(currentBuyPrice);
 
-                    // คำนวณผลต่าง (เปรียบเทียบกับราคาก่อนหน้าของวันนี้)
-                    // หมายเหตุ: เนื่องจาก API นี้ส่งคืนราคาล่าสุดอย่างเดียว เพื่อให้แสดงผลลัพธ์ได้ 
-                    // จึงนำมาเทียบกับราคาล่าสุดใน Array กราฟรายวันเป็นข้อมูลตั้งต้น
-                    const previousPrice = dailyData.prices[dailyData.prices.length - 2]; 
-                    const change = currentBuyPrice - previousPrice;
-                    
-                    const changeElement = document.getElementById('price-change');
-                    if (change > 0) {
-                        changeElement.innerText = `+${formatNumber(change)}`;
-                        changeElement.className = 'card-value positive';
-                    } else if (change < 0) {
-                        changeElement.innerText = `${formatNumber(change)}`;
-                        changeElement.className = 'card-value negative';
-                    } else {
-                        changeElement.innerText = `0`;
-                        changeElement.className = 'card-value neutral';
-                    }
-
-                    // อัปเดตจุดสุดท้ายของกราฟรายวันให้เป็นราคา Real-time
-                    dailyData.prices[dailyData.prices.length - 1] = currentBuyPrice;
-                    if(currentMode === 'daily') {
-                        renderChart(dailyData.labels, dailyData.prices);
+                    // ถ้าราคาที่ดึงมา ไม่ตรงกับราคาล่าสุดที่อยู่ใน Firebase (มีการปรับราคาขึ้น/ลง)
+                    // หรือเป็นครั้งแรกที่ยังไม่มีข้อมูลใน Firebase
+                    if (lastRecordedPrice === null || currentBuyPrice !== lastRecordedPrice) {
+                        
+                        // สั่งบันทึกลง Firebase Collection "price_history"
+                        await addDoc(collection(db, "price_history"), {
+                            buyPrice: currentBuyPrice,
+                            timestamp: new Date()
+                        });
+                        
+                        // โหลดข้อมูลกราฟใหม่ทั้งหมดเพื่ออัปเดตหน้าจอ
+                        await loadHistoryFromFirebase();
                     }
                 }
             } catch (error) {
-                console.error("ดึงข้อมูลล้มเหลว:", error);
-                document.getElementById('current-price').innerText = "ไม่สามารถเชื่อมต่อได้";
+                console.error("ดึงข้อมูล API ล้มเหลว:", error);
             }
         }
 
-        // เริ่มต้นการทำงานเมื่อโหลดหน้าเสร็จ
-        renderChart(dailyData.labels, dailyData.prices); // วาดกราฟตั้งต้น
-        fetchDashboardData(); // ดึงราคาจริงมาทับ
-        setInterval(fetchDashboardData, 60000); // อัปเดตข้อมูลทุก 1 นาที
+        // =====================================
+        // เริ่มต้นการทำงาน
+        // =====================================
+        
+        // 1. โหลดประวัติเดิมจาก Firebase มาวาดกราฟก่อน
+        await loadHistoryFromFirebase();
+        
+        // 2. เช็กราคาปัจจุบันจาก API ทันที
+        await fetchAndRecordPrice();
+        
+        // 3. ตั้งเวลาให้บอทเช็กราคาทุกๆ 1 นาที
+        setInterval(fetchAndRecordPrice, 60000); 
 
     </script>
 </body>
