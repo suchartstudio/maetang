@@ -32,18 +32,14 @@ const branchId = urlParams.get('branch') || '1';
 let currentMediaIndex = 0;
 let imageTimer = null;
 
-// ==========================================
-// 2. การตั้งค่าสไลด์ภาพนิ่ง
 const IMAGE_DURATION = 10000; 
 const FADE_DURATION = 1000;   
-// ==========================================
 
 // ==========================================
-// 3. ระบบจัดการประวัติราคา (สำหรับ Dashboard)
+// 2. ระบบจัดการประวัติราคา (สำหรับ Dashboard)
 // ==========================================
 let lastRecordedPrice = null;
 
-// ดึงราคาล่าสุดจาก Firebase เพื่อป้องกันการบันทึกซ้ำตอนรีเฟรชหน้าจอ
 async function initLastRecordedPrice() {
     try {
         const q = query(collection(db, "price_history"), orderBy("timestamp", "desc"), limit(1));
@@ -57,7 +53,6 @@ async function initLastRecordedPrice() {
 }
 initLastRecordedPrice();
 
-// ฟังก์ชันตรวจสอบและบันทึกราคา หากมีการปรับเปลี่ยน
 async function checkAndRecordPrice(currentBuyPrice) {
     if (!currentBuyPrice || isNaN(currentBuyPrice)) return;
     
@@ -68,13 +63,11 @@ async function checkAndRecordPrice(currentBuyPrice) {
                 timestamp: new Date()
             });
             lastRecordedPrice = currentBuyPrice;
-            console.log("บันทึกประวัติราคาใหม่เพื่ออัปเดต Dashboard:", currentBuyPrice);
         } catch (error) {
             console.error("บันทึกประวัติราคาล้มเหลว:", error);
         }
     }
 }
-// ==========================================
 
 function formatToIntegerPrice(priceStr) {
     if (!priceStr) return "-";
@@ -83,35 +76,44 @@ function formatToIntegerPrice(priceStr) {
     return isNaN(num) ? "-" : num.toLocaleString('en-US');
 }
 
-async function fetchGoldTradersPrice() {
+// ==========================================
+// 3. ฟังก์ชันดึงราคาใหม่จาก "ฮั่วเซ่งเฮง"
+// ==========================================
+async function fetchHuaSengHengPrice() {
     try {
-        const response = await fetch('https://api.chnwt.dev/thai-gold-api/latest');
-        const data = await response.json();
-        if (data.status !== "success") throw new Error("ไม่สามารถดึงข้อมูลจาก API ได้");
+        const targetUrl = 'https://apicheckpricev3.huasengheng.com/api/Values/GetPrice';
+        let data = null;
 
-        const prices = data.response.price;
-        
-        let updateDate = data.response.date;
-        if (!updateDate || updateDate === "undefined") {
-            const today = new Date();
-            updateDate = today.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-        } else {
-            const d = new Date(updateDate);
-            if (!isNaN(d)) updateDate = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+        try {
+            // 1. ลองดึงข้อมูลจากฮั่วเซ่งเฮงโดยตรง
+            const res = await fetch(targetUrl, { cache: "no-store" });
+            data = await res.json();
+        } catch (e) {
+            // 2. หากเบราว์เซอร์บล็อกความปลอดภัย (CORS) ให้สลับไปผ่านระบบ Proxy อัตโนมัติ
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}&cb=${Date.now()}`;
+            const res = await fetch(proxyUrl);
+            const proxyData = await res.json();
+            data = JSON.parse(proxyData.contents);
         }
-        
-        const updateTime = data.response.update_time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            throw new Error("ไม่สามารถอ่านข้อมูลจากฮั่วเซ่งเฮงได้");
+        }
+
+        // โครงสร้างข้อมูลฮั่วเซ่งเฮง: Array[0] มักจะเป็นทองแท่ง, Array[1] มักจะเป็นทองรูปพรรณ
+        const barData = data[0];
+        const ornData = data.length > 1 ? data[1] : data[0];
 
         return {
-            rawBarBuy: parseFloat(prices.gold_bar.buy.replace(/,/g, '')), // คืนค่าตัวเลขดิบสำหรับทำกราฟ
-            barBuy: formatToIntegerPrice(prices.gold_bar.buy),
-            barSell: formatToIntegerPrice(prices.gold_bar.sell),
-            ornamentBuy: formatToIntegerPrice(prices.gold.buy),
-            ornamentSell: formatToIntegerPrice(prices.gold.sell),
-            updateTime: `อัพเดทราคาล่าสุด: วันที่ ${updateDate} เวลา ${updateTime}`
+            rawBarBuy: parseFloat(barData.Buy.toString().replace(/,/g, '')), 
+            barBuy: formatToIntegerPrice(barData.Buy),
+            barSell: formatToIntegerPrice(barData.Sell),
+            ornamentBuy: formatToIntegerPrice(ornData.Buy),
+            ornamentSell: formatToIntegerPrice(ornData.Sell),
+            updateTime: barData.StrTimeUpdate || `อัพเดทราคาล่าสุด: วันที่ ${new Date().toLocaleDateString('th-TH')}`
         };
     } catch (error) {
-        console.error("เกิดข้อผิดพลาดในการดึงราคาจาก API:", error);
+        console.error("เกิดข้อผิดพลาดในการดึงราคาจาก ฮั่วเซ่งเฮง:", error);
         return null; 
     }
 }
@@ -134,56 +136,32 @@ function playCurrentMedia() {
     }
     
     clearTimeout(imageTimer);
-    
-    if (currentMediaIndex >= currentPlaylist.length) {
-        currentMediaIndex = 0; 
-    }
-
+    if (currentMediaIndex >= currentPlaylist.length) currentMediaIndex = 0; 
     const currentFile = currentPlaylist[currentMediaIndex];
 
     if (currentFile.type === 'video') {
         mediaContainer.innerHTML = ''; 
-
         const videoEl = document.createElement('video');
-        videoEl.id = 'signage-video';
         videoEl.src = currentFile.url;
         videoEl.autoplay = true;
         videoEl.muted = true;      
         videoEl.playsInline = true;
         videoEl.style.cssText = "width: 100%; height: 100%; object-fit: fill; background-color: #000;";
 
-        videoEl.onended = () => {
-            currentMediaIndex++;
-            playCurrentMedia(); 
-        };
-
-        videoEl.onerror = () => {
-            console.error(`ข้ามไฟล์วิดีโอเนื่องจากไม่สามารถโหลดได้: ${currentFile.name}`);
-            currentMediaIndex++;
-            playCurrentMedia();
-        };
+        videoEl.onended = () => { currentMediaIndex++; playCurrentMedia(); };
+        videoEl.onerror = () => { currentMediaIndex++; playCurrentMedia(); };
 
         mediaContainer.appendChild(videoEl);
-
         let playPromise = videoEl.play();
         if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.error("การเล่นวิดีโออัตโนมัติถูกปิดกั้น:", error);
-                currentMediaIndex++;
-                playCurrentMedia();
-            });
+            playPromise.catch(() => { currentMediaIndex++; playCurrentMedia(); });
         }
     } 
     else {
-        if (mediaContainer.style.position !== 'relative') {
-            mediaContainer.style.position = 'relative';
-        }
-
+        if (mediaContainer.style.position !== 'relative') mediaContainer.style.position = 'relative';
         const existingImg = mediaContainer.querySelector('img.active-fader-img');
-
         const nextImg = document.createElement('img');
         nextImg.src = currentFile.url;
-        nextImg.alt = "Signage Media";
         nextImg.className = "fader-img"; 
         nextImg.style.cssText = `position: absolute; top:0; left:0; width: 100%; height: 100%; object-fit: fill; opacity: 0; transition: opacity ${FADE_DURATION}ms ease-in-out;`;
 
@@ -191,80 +169,58 @@ function playCurrentMedia() {
             if (existingImg) {
                 nextImg.style.zIndex = "1";
                 mediaContainer.appendChild(nextImg);
-
                 existingImg.style.zIndex = "1";
                 nextImg.style.zIndex = "2";
-
                 void nextImg.offsetWidth; 
-
                 nextImg.style.opacity = "1";
                 existingImg.style.opacity = "0";
-                
                 existingImg.classList.remove('active-fader-img');
                 nextImg.classList.add('active-fader-img');
-
-                setTimeout(() => {
-                    existingImg.remove();
-                }, FADE_DURATION);
-
+                setTimeout(() => { existingImg.remove(); }, FADE_DURATION);
             } else {
                 mediaContainer.innerHTML = ''; 
                 nextImg.style.opacity = "1";
                 nextImg.classList.add('active-fader-img');
                 mediaContainer.appendChild(nextImg);
             }
-
-            imageTimer = setTimeout(() => {
-                currentMediaIndex++;
-                playCurrentMedia();
-            }, IMAGE_DURATION); 
+            imageTimer = setTimeout(() => { currentMediaIndex++; playCurrentMedia(); }, IMAGE_DURATION); 
         };
-        
-        nextImg.onerror = () => {
-            console.error(`ข้ามไฟล์ภาพเนื่องจากไม่สามารถโหลดได้: ${currentFile.name}`);
-            currentMediaIndex++;
-            playCurrentMedia();
-        };
+        nextImg.onerror = () => { currentMediaIndex++; playCurrentMedia(); };
     }
 }
 
 playCurrentMedia();
-
 let autoFetchInterval = null;
 
 onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
     if (docSnap.exists()) {
         const config = docSnap.data();
-        
         if (autoFetchInterval) clearInterval(autoFetchInterval);
 
         if (config.isAutoMode) {
-            const goldPrice = await fetchGoldTradersPrice();
+            const goldPrice = await fetchHuaSengHengPrice(); // เรียกใช้ API ใหม่
             if (goldPrice && goldPrice.barBuy !== "-") {
                 updateTextData({ ...config, ...goldPrice }); 
-                checkAndRecordPrice(goldPrice.rawBarBuy); // ส่งค่าดึงอัตโนมัติไปบันทึกลง Dashboard
+                checkAndRecordPrice(goldPrice.rawBarBuy); 
             } else {
                 updateTextData(config); 
             }
 
             autoFetchInterval = setInterval(async () => {
-                const freshPrice = await fetchGoldTradersPrice();
+                const freshPrice = await fetchHuaSengHengPrice(); // ตรวจสอบราคาทุกนาที
                 if (freshPrice && freshPrice.barBuy !== "-") {
                     updateTextData(freshPrice);
-                    checkAndRecordPrice(freshPrice.rawBarBuy); // อัปเดตซ้ำทุกๆ นาที
+                    checkAndRecordPrice(freshPrice.rawBarBuy);
                 }
             }, 60000);
 
         } else {
             const manualConfig = { ...config };
-            
-            // กรณีใช้โหมด Manual ก็ส่งราคาตั้งเองไปแสดงบนกราฟได้เช่นกัน
             if (manualConfig.barBuy) {
                 const rawManualPrice = parseFloat(manualConfig.barBuy.toString().replace(/,/g, ''));
                 checkAndRecordPrice(rawManualPrice);
                 manualConfig.barBuy = formatToIntegerPrice(manualConfig.barBuy);
             }
-            
             if (manualConfig.barSell) manualConfig.barSell = formatToIntegerPrice(manualConfig.barSell);
             if (manualConfig.ornamentBuy) manualConfig.ornamentBuy = formatToIntegerPrice(manualConfig.ornamentBuy);
             if (manualConfig.ornamentSell) manualConfig.ornamentSell = formatToIntegerPrice(manualConfig.ornamentSell);
@@ -280,6 +236,5 @@ onSnapshot(doc(db, "branches", branchId), async (docSnap) => {
 
             updateTextData(manualConfig);
         }
-
     }
 });
