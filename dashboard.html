@@ -268,32 +268,37 @@
             }
         }
 
-        // ฟังก์ชันตรวจสอบและบันทึกราคาใหม่จากสมาคม
+  // ฟังก์ชันตรวจสอบและบันทึกราคาใหม่จากฮั่วเซ่งเฮง
         async function fetchAndRecordPrice() {
             try {
-                const response = await fetch('https://api.chnwt.dev/thai-gold-api/latest');
-                const data = await response.json();
+                const targetUrl = 'https://apicheckpricev3.huasengheng.com/api/Values/GetPrice';
+                let data = null;
+
+                try {
+                    const res = await fetch(targetUrl, { cache: "no-store" });
+                    data = await res.json();
+                } catch (e) {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}&cb=${Date.now()}`;
+                    const res = await fetch(proxyUrl);
+                    const proxyData = await res.json();
+                    data = JSON.parse(proxyData.contents);
+                }
                 
-                if (data.status === "success") {
-                    const currentBuyPrice = parseFloat(data.response.price.gold_bar.buy.replace(/,/g, ''));
+                if (data && data.length > 0) {
+                    const barData = data[0];
+                    const currentBuyPrice = parseFloat(barData.Buy.toString().replace(/,/g, ''));
                     document.getElementById('current-price').innerText = formatNumber(currentBuyPrice);
 
-                    // ถ้าราคาที่ดึงมา ไม่ตรงกับราคาล่าสุดที่อยู่ใน Firebase (มีการปรับราคาขึ้น/ลง)
-                    // หรือเป็นครั้งแรกที่ยังไม่มีข้อมูลใน Firebase
                     if (lastRecordedPrice === null || currentBuyPrice !== lastRecordedPrice) {
-                        
-                        // สั่งบันทึกลง Firebase Collection "price_history"
                         await addDoc(collection(db, "price_history"), {
                             buyPrice: currentBuyPrice,
                             timestamp: new Date()
                         });
-                        
-                        // โหลดข้อมูลกราฟใหม่ทั้งหมดเพื่ออัปเดตหน้าจอ
                         await loadHistoryFromFirebase();
                     }
                 }
             } catch (error) {
-                console.error("ดึงข้อมูล API ล้มเหลว:", error);
+                console.error("ดึงข้อมูล API ฮั่วเซ่งเฮง ล้มเหลว:", error);
             }
         }
 
